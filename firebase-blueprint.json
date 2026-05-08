@@ -1,0 +1,94 @@
+{
+  "entities": {
+    "product": {
+      "title": "Product",
+      "description": "A refined lifestyle product",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name" },
+        "price": { "type": "string", "description": "Price with currency symbol" },
+        "category": { "type": "string", "description": "Product category" },
+        "image": { "type": "string", "description": "URL to product image" },
+        "rating": { "type": "number", "description": "Average rating (0-5)" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of creation" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of last update" }
+      },
+      "required": ["name", "price", "category", "image"]
+    },
+    "admin": {
+      "title": "Admin",
+      "description": "User with administrative privileges",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Admin email" },
+        "role": { "type": "string", "enum": ["admin"], "description": "User role" }
+      },
+      "required": ["email", "role"]
+    },
+    "order": {
+      "title": "Order",
+      "description": "A customer product order",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "description": "ID of the ordered product" },
+        "productName": { "type": "string", "description": "Name of the ordered product" },
+        "customerEmail": { "type": "string", "description": "Email of the customer" },
+        "paymentMethod": { "type": "string", "enum": ["bkash", "nagad", "credit_card", "debit_card"], "description": "Method of payment" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered"], "description": "Order status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of order" }
+      },
+      "required": ["productId", "productName", "customerEmail", "status", "paymentMethod"]
+    },
+    "support_ticket": {
+      "title": "Support Ticket",
+      "description": "Customer feedback or complaint",
+      "type": "object",
+      "properties": {
+        "customerEmail": { "type": "string", "description": "Email of the customer" },
+        "subject": { "type": "string", "description": "Subject of the message" },
+        "message": { "type": "string", "description": "Feedback content" },
+        "type": { "type": "string", "enum": ["complaint", "review", "inquiry"], "description": "Type of ticket" },
+        "status": { "type": "string", "enum": ["open", "resolved"], "description": "Ticket status" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of last update" }
+      },
+      "required": ["customerEmail", "subject", "message", "type", "status"]
+    },
+    "setting": {
+      "title": "Global Setting",
+      "description": "Global application configuration",
+      "type": "object",
+      "properties": {
+        "facebook": { "type": "string" },
+        "instagram": { "type": "string" },
+        "messenger": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "bkashNumber": { "type": "string" },
+        "nagadNumber": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  },
+  "firestore": {
+    "products": {
+      "schema": "product",
+      "description": "Collection of all products in the boutique"
+    },
+    "admins": {
+      "schema": "admin",
+      "description": "Collection of authorized administrators"
+    },
+    "orders": {
+      "schema": "order",
+      "description": "Collection of customer orders"
+    },
+    "support_tickets": {
+      "schema": "support_ticket",
+      "description": "Collection of customer feedback and support requests"
+    },
+    "settings": {
+      "schema": "setting",
+      "description": "Global application settings"
+    }
+  }
+}

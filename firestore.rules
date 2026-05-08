@@ -1,0 +1,151 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitives
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'sourovnnnn@gmail.com' ||
+        request.auth.token.email == 'aminulislamsurov02@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Phase 4: Drafting "Fortress" Rules
+
+    // --- Products ---
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'price', 'category', 'image', 'createdAt', 'updatedAt']) &&
+             data.keys().size() <= 7 && // name, price, category, image, createdAt, updatedAt, [rating]
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.price is string && data.price.size() > 0 && data.price.size() <= 20 &&
+             data.category is string && data.category.size() > 0 && data.category.size() <= 50 &&
+             data.image is string && data.image.size() > 0 && data.image.size() <= 1000 &&
+             (!('rating' in data) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && 
+                    isValidId(productId) &&
+                    isValidProduct(incoming()) &&
+                    incoming().createdAt == request.time &&
+                    incoming().updatedAt == request.time;
+      
+      allow update: if isAdmin() &&
+                    isValidProduct(incoming()) &&
+                    incoming().updatedAt == request.time &&
+                    incoming().createdAt == existing().createdAt &&
+                    (
+                      // Action: Standard Update
+                      incoming().diff(existing()).affectedKeys().hasAny(['name', 'price', 'category', 'image', 'rating', 'updatedAt'])
+                    );
+      
+      allow delete: if isAdmin();
+    }
+
+    // --- Orders ---
+    function isValidOrder(data) {
+      return data.keys().hasAll(['productId', 'productName', 'customerEmail', 'paymentMethod', 'status', 'createdAt']) &&
+             data.keys().size() <= 7 && // + [updatedAt]
+             data.productId is string && isValidId(data.productId) &&
+             data.productName is string && data.productName.size() <= 100 &&
+             data.customerEmail is string && data.customerEmail == request.auth.token.email &&
+             data.paymentMethod in ['bkash', 'nagad', 'credit_card', 'debit_card'] &&
+             data.status in ['pending', 'processing', 'shipped', 'delivered'] &&
+             data.createdAt is timestamp;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isAdmin() || (isSignedIn() && existing().customerEmail == request.auth.token.email);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.customerEmail == request.auth.token.email);
+      
+      allow create: if isEmailVerified() &&
+                    isValidId(orderId) &&
+                    isValidOrder(incoming()) &&
+                    incoming().status == 'pending' &&
+                    incoming().createdAt == request.time;
+      
+      allow update: if isAdmin() &&
+                    // Action: Change Status
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                    incoming().status in ['pending', 'processing', 'shipped', 'delivered'] &&
+                    incoming().updatedAt == request.time;
+      
+      allow delete: if isAdmin();
+    }
+
+    // --- Support Tickets ---
+    function isValidTicket(data) {
+      return data.keys().hasAll(['customerEmail', 'subject', 'message', 'type', 'status', 'createdAt']) &&
+             data.keys().size() <= 7 && // + [updatedAt]
+             data.customerEmail is string && data.customerEmail == request.auth.token.email &&
+             data.subject is string && data.subject.size() <= 100 &&
+             data.message is string && data.message.size() <= 2000 &&
+             data.type in ['complaint', 'review', 'inquiry'] &&
+             data.status in ['open', 'resolved'] &&
+             data.createdAt is timestamp;
+    }
+
+    match /support_tickets/{ticketId} {
+      allow get: if isAdmin() || (isSignedIn() && existing().customerEmail == request.auth.token.email);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.customerEmail == request.auth.token.email);
+      
+      allow create: if isEmailVerified() &&
+                    isValidId(ticketId) &&
+                    isValidTicket(incoming()) &&
+                    incoming().status == 'open' &&
+                    incoming().createdAt == request.time;
+      
+      allow update: if isAdmin() &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) &&
+                    incoming().status in ['open', 'resolved'] &&
+                    incoming().updatedAt == request.time;
+      
+      allow delete: if isAdmin();
+    }
+
+    // --- Settings ---
+    function isValidSetting(data) {
+      return data.updatedAt is timestamp;
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSetting(incoming()) && incoming().updatedAt == request.time;
+    }
+
+    // --- Admins ---
+    match /admins/{adminId} {
+      allow read: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow write: if false; // Console only
+    }
+  }
+}
